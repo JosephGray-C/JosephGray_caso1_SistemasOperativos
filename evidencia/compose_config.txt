@@ -1,0 +1,140 @@
+name: plataforma-go
+services:
+  app1:
+    build:
+      context: /home/lenovo_t480/proyectos/plataforma-go
+      dockerfile: Dockerfile
+    cap_drop:
+      - ALL
+    container_name: plataforma-app1
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: true
+    environment:
+      DB_HOST: postgres
+      DB_NAME: plataforma
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      DB_PORT: "5432"
+      DB_SSLMODE: disable
+      DB_USER: plataforma
+    image: plataforma-go:local
+    networks:
+      backend: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8080
+        published: "8081"
+        protocol: tcp
+    read_only: true
+    restart: unless-stopped
+    secrets:
+      - source: db_password
+        target: /run/secrets/db_password
+    security_opt:
+      - no-new-privileges:true
+  app2:
+    build:
+      context: /home/lenovo_t480/proyectos/plataforma-go
+      dockerfile: Dockerfile
+    cap_drop:
+      - ALL
+    container_name: plataforma-app2
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: true
+    environment:
+      DB_HOST: postgres
+      DB_NAME: plataforma
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      DB_PORT: "5432"
+      DB_SSLMODE: disable
+      DB_USER: plataforma
+    image: plataforma-go:local
+    networks:
+      backend: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8080
+        published: "8082"
+        protocol: tcp
+    read_only: true
+    restart: unless-stopped
+    secrets:
+      - source: db_password
+        target: /run/secrets/db_password
+    security_opt:
+      - no-new-privileges:true
+  haproxy:
+    container_name: plataforma-haproxy
+    depends_on:
+      app1:
+        condition: service_started
+        required: true
+      app2:
+        condition: service_started
+        required: true
+    image: haproxy:3.2-alpine
+    networks:
+      backend: null
+    ports:
+      - mode: ingress
+        target: 80
+        published: "8080"
+        protocol: tcp
+      - mode: ingress
+        target: 443
+        published: "8443"
+        protocol: tcp
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8404
+        published: "8404"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /home/lenovo_t480/proyectos/plataforma-go/haproxy/haproxy.cfg
+        target: /usr/local/etc/haproxy/haproxy.cfg
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /home/lenovo_t480/proyectos/plataforma-go/haproxy/certs
+        target: /usr/local/etc/haproxy/certs
+        read_only: true
+        bind: {}
+  postgres:
+    container_name: plataforma-postgres
+    environment:
+      POSTGRES_DB: plataforma
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_USER: plataforma
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U plataforma -d plataforma
+      timeout: 3s
+      interval: 5s
+      retries: 10
+    image: postgres:17-alpine
+    networks:
+      backend: null
+    restart: unless-stopped
+    secrets:
+      - source: db_password
+        target: /run/secrets/db_password
+    volumes:
+      - type: bind
+        source: /home/lenovo_t480/docker-data/plataforma-postgres
+        target: /var/lib/postgresql/data
+networks:
+  backend:
+    name: plataforma-go_backend
+    driver: bridge
+secrets:
+  db_password:
+    name: plataforma-go_db_password
+    file: /home/lenovo_t480/proyectos/plataforma-go/secrets/db_password.txt
