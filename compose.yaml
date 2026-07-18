@@ -1,0 +1,136 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: plataforma-postgres
+
+    environment:
+      POSTGRES_USER: plataforma
+      POSTGRES_DB: plataforma
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+
+    secrets:
+      - db_password
+
+    volumes:
+      - type: bind
+        source: ${POSTGRES_DATA_DIR}
+        target: /var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U plataforma -d plataforma
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+    restart: unless-stopped
+
+    networks:
+      - backend
+
+  app1:
+    build:
+      context: .
+
+    image: ${APP_IMAGE:-plataforma-go:local}
+    container_name: plataforma-app1
+
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: plataforma
+      DB_NAME: plataforma
+      DB_SSLMODE: disable
+      DB_PASSWORD_FILE: /run/secrets/db_password
+
+    secrets:
+      - db_password
+
+    ports:
+      - "127.0.0.1:8081:8080"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    read_only: true
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
+    restart: unless-stopped
+
+    networks:
+      - backend
+
+  app2:
+    build:
+      context: .
+
+    image: ${APP_IMAGE:-plataforma-go:local}
+    container_name: plataforma-app2
+
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: plataforma
+      DB_NAME: plataforma
+      DB_SSLMODE: disable
+      DB_PASSWORD_FILE: /run/secrets/db_password
+
+    secrets:
+      - db_password
+
+    ports:
+      - "127.0.0.1:8082:8080"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    read_only: true
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
+    restart: unless-stopped
+
+    networks:
+      - backend
+
+  haproxy:
+    image: haproxy:3.2-alpine
+    container_name: plataforma-haproxy
+
+    ports:
+      - "8080:80"
+      - "8443:443"
+      - "127.0.0.1:8404:8404"
+
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./haproxy/certs:/usr/local/etc/haproxy/certs:ro
+
+    depends_on:
+      - app1
+      - app2
+
+    restart: unless-stopped
+
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt

@@ -1,0 +1,6 @@
+.env
+secrets/*.txt
+*.log
+secrets/
+haproxy/certs/*.key
+haproxy/certs/*.pem
