@@ -22,7 +22,7 @@ var pageTemplate = template.Must(template.New("home").Parse(`
 	<title>Plataforma institucional</title>
 </head>
 <body>
-	<h1>Plataforma institucional en Go</h1>
+	<h1>Plataforma institucional en Go - CI/CD</h1>
 
 	<p>La aplicación está conectada con PostgreSQL.</p>
 
